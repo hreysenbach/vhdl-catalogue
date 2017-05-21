@@ -68,7 +68,10 @@ begin
             sda => sda,
             scl => scl
         );
-    
+
+    scl <= 'H';
+    sda <= 'H';
+
     clk_gen : process
     begin
         wait for 25 ns;
@@ -83,14 +86,13 @@ begin
     end process;
 
     process (clk)
-        variable count : integer := 0;
-        variable target: integer := 50_000_000 / (2 * 400_000) - 1;
+        variable prev_sample : std_logic := '0';
     begin
         if (rising_edge(clk)) then
-            if (count > target) then
-                count := 0;
+            if (scl <= '1' and prev_sample /= scl) then
                 slow_ticks <= slow_ticks + 1;
             end if;
+            prev_sample := scl;
         end if;
     end process;
     
@@ -99,17 +101,44 @@ begin
         
         case (ticks) is
             when 0 =>
-                receive <= '0';
+--                data <= X"AA";
                 high_speed <= '1';
                 start_bit <= '1';
                 stop_bit <= '1';
-                data <= X"AA";
+                receive <= '1';
                 enable <='1';
             when others =>
                 enable <= '0';
         end case;
-        
     end process;
+
+    process (clK)
+    begin
+        case (slow_ticks) is
+            when 0 =>
+            when 2 => 
+                sda <= '1';
+            when 3 => 
+                sda <= '0';
+            when 4 => 
+                sda <= '1';
+            when 5 => 
+                sda <= '0';
+            when 6 => 
+                sda <= '1';
+            when 7 => 
+                sda <= '0';
+            when 8 =>
+                sda <= '1';
+            when 9 =>
+                sda <= '0';
+            when others =>
+                scl <= 'H';
+                sda <= 'H';
+
+        end case;
+    end process;
+
         
 end architecture i2c_test;
 

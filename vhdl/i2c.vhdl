@@ -1,15 +1,6 @@
 -- 
 -- I2C Controller
 -- 
--- Contains a 8-word FIFO for transmit
--- Contains a 8-word FIFO for receive
--- If more than 1 word is in the transmit FIFO then a STOP condidtion is not 
--- generated and the peripheral will continue to transmit until the FIFo is
--- empty
--- If the receive bit is set then the peripheral sends data from the transmit
--- FIFO for 2 words and then will continue clocking SCL for another word to 
--- receive the required word. To continue reading the registers set the read
--- bit before the conclusion of reading the word.
 -- 
 -- 
 -- 
@@ -170,10 +161,57 @@ begin
                 clk_count := clk_count + 1;
             else 
                 clk_count := 0;
-                
-                
-                
-                
+               
+                if (bit_count = 0 and f_start = 1) then
+                    -- start bit
+                    sda <= '0';
+                    scl <= 'Z';
+                    sample := 0;
+                    bit_count := bit_count + 1;
+               elsif (bit_count = 10 and f_stop = 1) then
+                   if (sample = 0)  then
+                       scl <= '0';
+                       sda <= '0';
+                       sample := 1;
+                   elsif (sample = 1) then
+                       scl <= 'Z';
+                       sda <= '0';
+                       sample := 2;
+                   elsif (sample = 2) then
+                       scl <= 'Z';
+                       sda <= 'Z';
+                       bit_count := 0;
+                       state := s_nop;
+                       f_start := 0;
+                       f_stop := 0;
+                       sample := 0;
+                       data <= word;
+                   end if;
+               elsif (bit_count = 9) then
+                   -- ack condition
+                   if (sample = 1) then
+                       scl <= 'Z';
+                       sda <= '0';
+                       bit_count := bit_count + 1;
+                       sample := 0;
+                   else 
+                       scl <= '0';
+                       sda <= '0';
+                       sample := 1;
+                   end if;
+               else
+                   if (sample = 1) then
+                       scl <= 'Z';
+                       sda <= 'Z';
+                       bit_count := bit_count + 1;
+                       word(9 - bit_count) := sda;
+                       sample := 0;
+                   else
+                       scl <= '0';
+                       sda <= 'Z';
+                       sample := 1;
+                   end if;
+               end if; -- bit count
             end if; -- clk_count < target_count
             
         end if; -- state
