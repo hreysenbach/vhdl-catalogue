@@ -27,7 +27,8 @@ component i2c is
         stop_bit        : in        std_logic;
         enable          : in        std_logic;
         ack             : out       std_logic;
-        data            : inout     std_logic_vector(7 downto 0);
+        data_in         : in        std_logic_vector(7 downto 0);
+        data_out        : out       std_logic_vector(7 downto 0);
                 
         sda             : inout std_logic;
         scl             : inout std_logic
@@ -42,7 +43,8 @@ signal start_bit        : std_logic;
 signal stop_bit         : std_logic;
 signal enable           : std_logic;
 signal ack              : std_logic;
-signal data             : std_logic_vector(7 downto 0);
+signal data_in          : std_logic_vector(7 downto 0);
+signal data_out         : std_logic_vector(7 downto 0);
                 
 signal sda              : std_logic := 'Z';
 signal scl              : std_logic := 'Z';
@@ -64,7 +66,8 @@ begin
             stop_bit => stop_bit,
             enable => enable,
             ack => ack,
-            data => data,
+            data_in => data_in,
+            data_out => data_out,
             sda => sda,
             scl => scl
         );

@@ -27,10 +27,11 @@ entity i2c is
         stop_bit        : in        std_logic;
         enable          : in        std_logic;
         ack             : out       std_logic := '0';
-        data            : inout     std_logic_vector(7 downto 0) := (others => 'Z');
+        data_in         : in        std_logic_vector(7 downto 0);
+        data_out        : out       std_logic_vector(7 downto 0);
                 
-        sda             : inout std_logic;
-        scl             : inout std_logic
+        sda             : inout     std_logic;
+        scl             : inout     std_logic
     );
 end entity i2c;
 
@@ -75,6 +76,7 @@ begin
                     else
                         target_count <= slow_count;
                     end if;
+                    data_out <= X"00";
                     
                 else
                     state := s_transmit;
@@ -91,7 +93,7 @@ begin
                         target_count <= slow_count;
                     end if;
                     
-                    word := data;
+                    word := data_in;
                 end if; -- receive
             end if; -- enable
             
@@ -185,7 +187,7 @@ begin
                        f_start := 0;
                        f_stop := 0;
                        sample := 0;
-                       data <= word;
+                       data_out <= word;
                    end if;
                elsif (bit_count = 9) then
                    -- ack condition
