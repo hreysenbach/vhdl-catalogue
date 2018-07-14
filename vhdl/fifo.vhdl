@@ -60,11 +60,11 @@ begin
                 else
                     if (wrreq = '1' and words < number_of_words) then
                         mem_array(write_ptr) <= data;
-                        if (write_ptr < numer_of_words - 1) then
-                            write_ptr <= write_ptr + 1;
+                        if (write_ptr < number_of_words - 1) then
+                            write_ptr := write_ptr + 1;
                         else 
-                            write_ptr <= 0;
-                            looped <= true;
+                            write_ptr := 0;
+                            looped := true;
                         end if;
                         words <= words + 1;
                     end if;
@@ -73,9 +73,9 @@ begin
                         q <= mem_array(read_ptr);
                         words <= words - 1;
                         if (read_ptr < number_of_words - 1) then
-                            read_ptr <= read_ptr + 1;
+                            read_ptr := read_ptr + 1;
                         else
-                            read_ptr <= 0;
+                            read_ptr := 0;
                             looped := false;
                         end if;
                     end if;
@@ -83,7 +83,7 @@ begin
                     if (words > almost_full_threshold) then
                         almost_full <= '1';
                     else 
-                        almost_full <= 0;
+                        almost_full <= '0';
                     end if; 
                     
                     if (words < almost_empty_threshold) then
@@ -96,7 +96,7 @@ begin
                         empty <= '1';
                     else 
                         empty <= '0';
-                    end if
+                    end if;
 
                     if (words = number_of_words) then
                         full <= '1';
