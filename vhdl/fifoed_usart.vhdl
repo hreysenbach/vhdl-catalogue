@@ -155,6 +155,7 @@ begin
                         readdata <= rx_out;
                     when 1 =>
                         -- TX Data Reg
+                        -- Hello
                         readdata <= tx_word;
                     when 2 =>
                         -- Status Reg
