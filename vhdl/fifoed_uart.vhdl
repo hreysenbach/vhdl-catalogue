@@ -9,7 +9,7 @@ use ieee.numeric_std.all;
 entity fifoed_usart is
     generic (
         clk_freq            : integer := 50000000;
-        baud_rate           : integer := 115200;
+        default_baud_rate   : integer := 115200;
         flow_control        : boolean := false; -- Not implemented
         word_width          : integer := 8; -- Valid values are 7, 8, 9
         parity              : boolean := false;
@@ -27,27 +27,27 @@ entity fifoed_usart is
         write_n             : in    std_logic;
         read_n              : in    std_logic;
         address             : in    std_logic_vector(7 downto 0);
-        readdata            : out   std_logic_vector(31 downto 0);
+        readdata            : out   std_logic_vector(31 downto 0) := (others => '0');
         writedata           : in    std_logic_vector(31 downto 0);
-        irq                 : out   std_logic;
+        irq                 : out   std_logic  := '0';
 
         -- UART interface
-        tx                  : out   std_logic;
+        tx                  : out   std_logic := '1';
         rx                  : in    std_logic;
         cts_n               : in    std_logic;
-        rts_n               : out   std_logic
+        rts_n               : out   std_logic := '1'
     );
 end entity;
 
 
 architecture behavioural of fifoed_usart is
 
-    function f_log2 (x : positive) return natural is
+    function f_log2 (x : integer) return natural is
         variable i : natural;
     begin
         i := 0;
 
-        while (2**i < x) and i < 31 loop
+        while (2**i <= x) and i < 31 loop
             i := i + 1;
         end loop;
 
@@ -57,33 +57,49 @@ architecture behavioural of fifoed_usart is
     type tx_state_t is (tx_idle, tx_start, tx_data, tx_parity, tx_stop);
     type rx_state_t is (rx_idle, rx_start, rx_data, rx_parity, rx_stop);
 
-    constant tx_fifo_depth_widthu : natural := f_log2(tx_fifo_depth);
-    constant rx_fifo_depth_widthu : natural := f_log2(rx_fifo_depth);
+    constant tx_fifo_depth_widthu   : unsigned(f_log2(tx_fifo_depth) downto 0) 
+                                        := to_unsigned(f_log2(tx_fifo_depth), 
+                                        f_log2(tx_fifo_depth));
+
+    constant rx_fifo_depth_widthu   : unsigned(f_log2(rx_fifo_depth) downto 0) 
+                                        := to_unsigned(f_log2(rx_fifo_depth), 
+                                        f_log2(rx_fifo_depth));
+
+    constant bit_count_target       : unsigned(f_log2(word_width) downto 0) 
+                                        := to_unsigned(word_width, f_log2(word_width));
 
     signal tx_state                 : tx_state_t := tx_idle;
     signal rx_state                 : rx_state_t := rx_idle;
 
-    signal rx_almost_empty          : std_logic;
-    signal rx_almost_full           : std_logic;
-    signal rx_received              : std_logic_vector(word_width-1 downto 0);
-    signal rx_empty                 : std_logic;
-    signal rx_full                  : std_logic;
-    signal rx_out                   : std_logic_vector(word_width-1 downto 0);
-    signal rx_rdreq                 : std_logic;
-    signal rx_sclr                  : std_logic;
-    signal rx_usedw                 : std_logic_vector(tx_fifo_depth_widthu-1 downto 0);
-    signal rx_wrreq                 : std_logic;
+    signal rx_almost_empty          : std_logic := '0';
+    signal rx_almost_full           : std_logic := '0';
+    signal rx_received              : std_logic_vector(word_width-1 downto 0) 
+                                        := (others => '0');
+    signal rx_empty                 : std_logic := '0';
+    signal rx_full                  : std_logic := '0';
+    signal rx_out                   : std_logic_vector(word_width-1 downto 0)
+                                        := (others => '0');
+    signal rx_rdreq                 : std_logic := '0';
+    signal rx_sclr                  : std_logic := '0';
+    signal rx_usedw                 : std_logic_vector(to_integer(
+                                        rx_fifo_depth_widthu)-1 downto 0) 
+                                        := (others => '0');
+    signal rx_wrreq                 : std_logic := '0';
 
-    signal tx_almost_empty          : std_logic;
-    signal tx_almost_full           : std_logic;
-    signal tx_received              : std_logic_vector(word_width-1 downto 0);
-    signal tx_empty                 : std_logic;
-    signal tx_full                  : std_logic;
-    signal tx_out                   : std_logic_vector(word_width-1 downto 0);
-    signal tx_rdreq                 : std_logic;
-    signal tx_sclr                  : std_logic;
-    signal tx_usedw                 : std_logic_vector(tx_fifo_depth_widthu-1 downto 0);
-    signal tx_wrreq                 : std_logic;
+    signal tx_almost_empty          : std_logic := '0';
+    signal tx_almost_full           : std_logic := '0';
+    signal tx_received              : std_logic_vector(word_width-1 downto 0) 
+                                            := (others => '0');
+    signal tx_empty                 : std_logic := '0';
+    signal tx_full                  : std_logic := '0';
+    signal tx_out                   : std_logic_vector(word_width-1 downto 0) 
+                                            := (others => '0');
+    signal tx_rdreq                 : std_logic := '0';
+    signal tx_sclr                  : std_logic := '0';
+    signal tx_usedw                 : std_logic_vector(to_integer(
+                                        tx_fifo_depth_widthu)-1 downto 0) 
+                                        := (others => '0');
+    signal tx_wrreq                 : std_logic := '0';
 
     component scfifo
         generic (
@@ -124,7 +140,7 @@ begin
             lpm_numwords            => tx_fifo_depth,
             lpm_showahead           => "on",
             lpm_width               => word_width,
-            lpm_widthu              => tx_fifo_depth_widthu,
+            lpm_widthu              => to_integer(tx_fifo_depth_widthu),
             overflow_checking       => "on",
             underflow_checking      => "on",
             use_eab                 => "on",
@@ -148,6 +164,8 @@ begin
 
     begin
         if (rising_edge(clk)) then
+            rx_rdreq <= '0';
+            tx_wrreq <= '0';
             if (read_n = '0') then
                 case (to_integer(unsigned(address))) is
                     when 0 =>
@@ -155,7 +173,8 @@ begin
                         readdata <= rx_out;
                     when 1 =>
                         -- TX Data Reg
-                        readdata <= tx_word;
+                        tx_received <= writedata;
+                        tx_wrreq <= '1';
                     when 2 =>
                         -- Status Reg
                     when 3 =>
@@ -172,83 +191,7 @@ begin
         end if;
     end process;
 
-    transmit : process (clk)
-
-    begin
-        if (rising_edge(clk)) then
-            tx_rdreq <= '0';
-            tx <= '1';
-            case (tx_state) is
-                when tx_idle =>
-                    if (tx_empty = '0') then
-                        tx_word <= tx_out;
-                        tx_rdreq <= '1';
-                    end if;
-                    tx_state <= tx_start;
-                when tx_start =>
-                    tx <= '0';
-                    if (tx_count < tx_clk_target) then
-                        tx_count := tx_count + 1;
-                    else
-                        tx_count := 0;
-                        tx_state <= tx_data;
-                        tx_bit_count := 0;
-                        if (parity = true) then
-                            if (parity_even = true) then
-                                parity_bit := '0';
-                            else
-                                parity_bit := '1';
-                            end if;
-                        end if;
-                    end if;
-                when tx_data =>
-                    tx <= tx_data(tx_bit_count);
-                    if (tx_count < tx_clk_target) then
-                        tx_count := tx_count + 1;
-                    else
-                        tx_count := 0;
-
-                        if (parity = true) then
-                            parity_bit := parity_bit xor tx_data(tx_bit_count);
-                        end if;
-
-                        if (tx_bit_count < word_width - 1) then
-                            tx_bit_count := tx_bit_count + 1;
-                        else
-                            tx_bit_count := 0;
-                            if (parity = true) then
-                                tx_state <= tx_parity;
-                            else
-                                tx_state <= tx_stop;
-                            end if;
-                        end if;
-                    end if;
-                when tx_parity =>
-                    tx <= parity_bit;
-                    if (tx_count < tx_clk_target) then
-                        tx_count := tx_count + 1;
-                    else 
-                        tx_count := 0;
-
-                        tx_state <= tx_stop;
-                    end if;
-                when tx_stop =>
-                    tx <= '1';
-                    if (tx_count < tx_clk_target) then
-                        tx_count := tx_count + 1;
-                    else
-                        tx_count := 0;
-
-                        if (tx_stop_count < stop_bits) then
-                            tx_stop_count := tx_stop_count + 1;
-                        else 
-                            tx_state <= tx_idle;
-                        end if;
-                    end if;
-
-            end case; -- tx_state
-        end if;
-    end process;
+    
 
     receive : process (clk)
 
