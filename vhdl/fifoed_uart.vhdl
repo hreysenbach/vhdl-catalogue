@@ -5,6 +5,9 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+library work;
+use work.my_lib.all;
+
 
 entity fifoed_usart is
     generic (
@@ -42,21 +45,6 @@ end entity;
 
 architecture behavioural of fifoed_usart is
 
-    function f_log2 (x : integer) return natural is
-        variable i : natural;
-    begin
-        i := 0;
-
-        while (2**i <= x) and i < 31 loop
-            i := i + 1;
-        end loop;
-
-        return i;
-    end function;
-
-    type tx_state_t is (tx_idle, tx_start, tx_data, tx_parity, tx_stop);
-    type rx_state_t is (rx_idle, rx_start, rx_data, rx_parity, rx_stop);
-
     constant tx_fifo_depth_widthu   : unsigned(f_log2(tx_fifo_depth) downto 0) 
                                         := to_unsigned(f_log2(tx_fifo_depth), 
                                         f_log2(tx_fifo_depth));
@@ -67,9 +55,6 @@ architecture behavioural of fifoed_usart is
 
     constant bit_count_target       : unsigned(f_log2(word_width) downto 0) 
                                         := to_unsigned(word_width, f_log2(word_width));
-
-    signal tx_state                 : tx_state_t := tx_idle;
-    signal rx_state                 : rx_state_t := rx_idle;
 
     signal rx_almost_empty          : std_logic := '0';
     signal rx_almost_full           : std_logic := '0';
@@ -188,16 +173,6 @@ begin
                         readdata <= (others => '0');
                 end case;
             end if;
-        end if;
-    end process;
-
-    
-
-    receive : process (clk)
-
-    begin
-        if (rising_edge(clk)) then
-            
         end if;
     end process;
 

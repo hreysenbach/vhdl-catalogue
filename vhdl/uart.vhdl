@@ -4,6 +4,9 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+library work;
+use work.my_lib.all;
+
 entity uart is
     generic(
         clk_freq    : integer := 50000000;
@@ -35,6 +38,11 @@ end entity;
 
 architecture behavioural of uart is 
 
+    type tx_state_t is (tx_idle_s, tx_start_s, tx_data_s, tx_parity_s, tx_stop_s);
+    type rx_state_t is (rx_idle_s, rx_start_s, rx_data_s, rx_parity_s, rx_stop_s);
+
+    signal tx_state                 : tx_state_t := tx_idle_s;
+    signal rx_state                 : rx_state_t := rx_idle_s;
 
 begin
 
@@ -45,25 +53,28 @@ begin
                                         := (others => '0');
         variable tx_word            : std_logic_vector(word_width-1 downto 0)
                                         := (others => '0');
+        variable parity_bit         : std_logic := '0';
+        variable tx_stop_count      : unsigned(1 downto 0) := (others => '0');
     begin
         if (rising_edge(clk)) then
-            tx_rdreq <= '0';
             tx <= '1';
+            tx_idle <= '0';
             case (tx_state) is
-                when tx_idle =>
-                    if (unsigned(tx_usedw) /= 0) then
-                        tx_word <= tx_out;
-                        tx_rdreq <= '1';
-                        tx_state <= tx_start;
+                when tx_idle_s =>
+                    tx_idle <= '1';
+                    if (tx_start = '1') then
+                        tx_word := tx_data;
+                        tx_idle <= '0';
+                        tx_state <= tx_start_s;
                     end if;
-                when tx_start =>
+                when tx_start_s =>
                     tx <= '0';
-                    if (tx_count < tx_clk_target) then
+                    if (tx_count < clk_target) then
                         tx_count := tx_count + 1;
                     else
-                        tx_count := 0;
-                        tx_state <= tx_data;
-                        tx_bit_count := 0;
+                        tx_count := X"000000";
+                        tx_state <= tx_data_s;
+                        tx_bit_count := (others => '0');
                         if (parity = true) then
                             if (parity_even = true) then
                                 parity_bit := '0';
@@ -72,52 +83,61 @@ begin
                             end if;
                         end if;
                     end if;
-                when tx_data =>
-                    tx <= tx_data(tx_bit_count);
-                    if (tx_count < tx_clk_target) then
+                when tx_data_s =>
+                    tx <= tx_word(to_integer(tx_bit_count));
+                    if (tx_count < clk_target) then
                         tx_count := tx_count + 1;
                     else
-                        tx_count := 0;
+                        tx_count := X"000000";
 
                         if (parity = true) then
-                            parity_bit := parity_bit xor tx_data(tx_bit_count);
+                            parity_bit := parity_bit xor tx_word(to_integer(tx_bit_count));
                         end if;
 
                         if (tx_bit_count < word_width - 1) then
                             tx_bit_count := tx_bit_count + 1;
                         else
-                            tx_bit_count := 0;
+                            tx_bit_count := (others => '0');
                             if (parity = true) then
-                                tx_state <= tx_parity;
+                                tx_state <= tx_parity_s;
                             else
-                                tx_state <= tx_stop;
+                                tx_state <= tx_stop_s;
                             end if;
                         end if;
                     end if;
-                when tx_parity =>
+                when tx_parity_s =>
                     tx <= parity_bit;
-                    if (tx_count < tx_clk_target) then
+                    if (tx_count < clk_target) then
                         tx_count := tx_count + 1;
                     else 
-                        tx_count := 0;
+                        tx_count := X"000000";
 
-                        tx_state <= tx_stop;
+                        tx_state <= tx_stop_s;
                     end if;
-                when tx_stop =>
+                when tx_stop_s =>
                     tx <= '1';
-                    if (tx_count < tx_clk_target) then
+                    if (tx_count < clk_target) then
                         tx_count := tx_count + 1;
                     else
-                        tx_count := 0;
+                        tx_count := X"000000";
 
                         if (tx_stop_count < stop_bits) then
                             tx_stop_count := tx_stop_count + 1;
                         else 
-                            tx_state <= tx_idle;
+                            tx_state <= tx_idle_s;
+                            tx_stop_count := (others => '0');
                         end if;
                     end if;
 
             end case; -- tx_state
+        end if;
+    end process;
+
+    receive : process (clk)
+
+    begin
+        if (rising_edge(clk)) then
+            
         end if;
     end process;
 
